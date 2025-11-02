@@ -1,16 +1,42 @@
 import * as posedetection from '@tensorflow-models/pose-detection';
+import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
-import '@tensorflow/tfjs';
 
 let detector: posedetection.PoseDetector | null = null;
+let loadingPromise: Promise<posedetection.PoseDetector> | null = null;
+
+async function initDetector() {
+  // 优先 webgl，失败则降级 cpu，确保不会一直卡加载
+  const backends = ['webgl', 'cpu'];
+  let ok = false;
+  for (const b of backends) {
+    try {
+      await tf.setBackend(b);
+      await tf.ready();
+      ok = true;
+      break;
+    } catch (err) {
+      console.warn('backend init failed for', b, err);
+    }
+  }
+  if (!ok) {
+    await tf.setBackend('cpu');
+    await tf.ready();
+  }
+
+  const d = await posedetection.createDetector(posedetection.SupportedModels.MoveNet, {
+    modelType: 'singlepose.Lightning',
+  });
+  detector = d;
+  return d;
+}
 
 export async function loadDetector() {
   if (detector) return detector;
-  await (await import('@tensorflow/tfjs')).setBackend('webgl');
-  detector = await posedetection.createDetector(posedetection.SupportedModels.MoveNet, {
-    modelType: 'singlepose.Lightning',
-  });
-  return detector;
+  if (!loadingPromise) {
+    loadingPromise = initDetector();
+  }
+  return loadingPromise;
 }
 
 export function angleBetween(a: any, b: any, c: any) {
