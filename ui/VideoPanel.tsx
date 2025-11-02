@@ -39,6 +39,7 @@ export function VideoPanel({ videoRef, onFrame, loading }: { videoRef: any; onFr
     videoRef.current.src = url;
     videoRef.current.onloadedmetadata = () => {
       videoRef.current?.play();
+      // 上传后自动分析一帧，避免用户不知道要点哪里
       onFrame();
     };
   };
@@ -70,7 +71,10 @@ export function VideoPanel({ videoRef, onFrame, loading }: { videoRef: any; onFr
         <input type="file" accept="video/*" onChange={handleFile} style={{ width: '100%' }} />
       )}
       <video ref={videoRef} style={{ width: '100%', borderRadius: '0.75rem', background: '#000', aspectRatio: '3 / 4' }} playsInline muted />
-      <p style={{ opacity: 0.5, fontSize: '0.8rem' }}>{loading ? '模型加载中...' : '点击上方“抓取一帧”或上传视频后识别'}</p>
+      <button type="button" className="btn" onClick={onFrame} disabled={loading} style={{ alignSelf: 'flex-start' }}>
+        {loading ? '模型加载中...' : '开始分析'}
+      </button>
+      <p style={{ opacity: 0.5, fontSize: '0.8rem', margin: 0 }}>点击“开始分析”或上传视频后自动识别</p>
       {error && <p style={{ color: '#fda4af', fontSize: '0.7rem', margin: 0 }}>{error}</p>}
       <details style={{ background: 'rgba(15,23,42,0.35)', borderRadius: '0.5rem', padding: '0.5rem 0.75rem' }}>
         <summary>如何拍摄更准确?</summary>

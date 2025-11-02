@@ -19,6 +19,7 @@ export default function Page() {
   const [radar, setRadar] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +48,6 @@ export default function Page() {
   const handleFrame = async () => {
     if (!detector || !videoRef.current) return;
     try {
-      // 兼容 tfjs / mediapipe detector 的调用方式
       const ps = await detector.estimatePoses(videoRef.current);
       setPoses(ps);
       if (ps && ps[0]) {
@@ -88,7 +88,7 @@ export default function Page() {
               <div style={{ flex: '1 1 220px' }}>
                 <p style={{ opacity: 0.6, marginBottom: '0.5rem' }}>当前得分</p>
                 <div style={{ fontSize: '3rem', fontWeight: 700, lineHeight: 1 }}>
-                  {score !== null ? score.toFixed(1) : '--'}
+                  {score !== null ? score.toFixed(1) : '0.0'}
                 </div>
                 <p style={{ opacity: 0.6, marginTop: '0.25rem' }}>满分 100，可在右侧配置面板调整权重</p>
                 {loadError && (
@@ -97,14 +97,22 @@ export default function Page() {
               </div>
             </div>
           </div>
-          <div className="panel" style={{ padding: '1rem', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ flex: '1 1 240px' }}>
-              <h3 style={{ marginTop: 0 }}>雷达图</h3>
-              <ShotRadar data={radar} />
+          <div className="panel" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+              <h3 style={{ margin: 0 }}>雷达图</h3>
+              <button type="button" className="btn" onClick={() => setShowConfig(v => !v)}>
+                {showConfig ? '收起配置' : '评分配置'}
+              </button>
             </div>
-            <div style={{ flex: '1 1 220px' }}>
-              <h3 style={{ marginTop: 0 }}>评分标准配置</h3>
-              <ConfigPanel value={activeRules} onChange={setActiveRules} />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+              <div style={{ flex: '1 1 240px', minWidth: 240 }}>
+                <ShotRadar data={radar} />
+              </div>
+              {showConfig && (
+                <div style={{ flex: '1 1 220px', minWidth: 220 }}>
+                  <ConfigPanel value={activeRules} onChange={setActiveRules} />
+                </div>
+              )}
             </div>
           </div>
         </div>
