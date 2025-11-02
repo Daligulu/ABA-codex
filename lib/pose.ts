@@ -1,40 +1,48 @@
-import * as posedetection from '@tensorflow-models/pose-detection';
+import * as poseDetection from '@tensorflow-models/pose-detection';
 import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
+import '@tensorflow/tfjs-backend-cpu';
 
-let detector: posedetection.PoseDetector | null = null;
-let loadingPromise: Promise<posedetection.PoseDetector> | null = null;
+let detector: poseDetection.PoseDetector | null = null;
+let loadingPromise: Promise<poseDetection.PoseDetector> | null = null;
 
 async function initDetector() {
-  // 优先 webgl，失败则降级 cpu，确保不会一直卡加载
-  const backends = ['webgl', 'cpu'];
-  let ok = false;
-  for (const b of backends) {
+  // iOS / Safari / 部分安卓会禁掉 webgl，需要兜底到 cpu
+  const candidateBackends: Array<'webgl' | 'cpu'> = ['webgl', 'cpu'];
+  let set = false;
+  for (const b of candidateBackends) {
     try {
       await tf.setBackend(b);
       await tf.ready();
-      ok = true;
+      set = true;
       break;
     } catch (err) {
-      console.warn('backend init failed for', b, err);
+      console.warn('backend init failed:', b, err);
     }
   }
-  if (!ok) {
-    await tf.setBackend('cpu');
-    await tf.ready();
+  if (!set) {
+    throw new Error('No available tfjs backend (webgl/cpu)');
   }
 
-  const d = await posedetection.createDetector(posedetection.SupportedModels.MoveNet, {
-    modelType: 'singlepose.Lightning',
-  });
-  detector = d;
-  return d;
+  // ⚠️ 注意：pose-detection 的 MoveNet 要用枚举，不要写字符串
+  const detector = await poseDetection.createDetector(
+    poseDetection.SupportedModels.MoveNet,
+    {
+      modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+      enableSmoothing: true,
+    } as poseDetection.movenet.MovenetModelConfig
+  );
+
+  return detector;
 }
 
 export async function loadDetector() {
   if (detector) return detector;
   if (!loadingPromise) {
-    loadingPromise = initDetector();
+    loadingPromise = initDetector().then(d => {
+      detector = d;
+      return d;
+    });
   }
   return loadingPromise;
 }
