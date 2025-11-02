@@ -7,31 +7,33 @@ let detector: poseDetection.PoseDetector | null = null;
 let loadingPromise: Promise<poseDetection.PoseDetector> | null = null;
 
 async function initDetector() {
-  // iOS / Safari / 部分安卓会禁掉 webgl，需要兜底到 cpu
-  const candidateBackends: Array<'webgl' | 'cpu'> = ['webgl', 'cpu'];
-  let set = false;
-  for (const b of candidateBackends) {
+  // 1. 选择一个可用的后端，优先 webgl，不行就 cpu
+  const candidates: Array<'webgl' | 'cpu'> = ['webgl', 'cpu'];
+  let ready = false;
+  for (const b of candidates) {
     try {
       await tf.setBackend(b);
       await tf.ready();
-      set = true;
+      ready = true;
       break;
     } catch (err) {
-      console.warn('backend init failed:', b, err);
+      console.warn('[pose] backend init failed:', b, err);
     }
   }
-  if (!set) {
-    throw new Error('No available tfjs backend (webgl/cpu)');
+  if (!ready) {
+    throw new Error('No TFJS backend available');
   }
 
-  // ⚠️ 注意：pose-detection 的 MoveNet 要用枚举，不要写字符串
-  const detector = await poseDetection.createDetector(
+  // 2. 创建 MoveNet 检测器
+  //   NOTE: pose-detection 的类型里不一定导出 movenet 命名空间，
+  //   所以这里直接用 any 来绕过 TS，在运行期仍然是标准配置。
+  const detector = (await poseDetection.createDetector(
     poseDetection.SupportedModels.MoveNet,
     {
-      modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+      modelType: 'singlepose.Lightning',
       enableSmoothing: true,
-    } as poseDetection.movenet.MovenetModelConfig
-  );
+    } as any
+  )) as poseDetection.PoseDetector;
 
   return detector;
 }
