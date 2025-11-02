@@ -28,11 +28,12 @@ export default function Page() {
         const d = await loadDetector();
         if (!cancelled) {
           setDetector(d);
+          setLoadError(null);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('pose detector load failed', err);
         if (!cancelled) {
-          setLoadError('模型加载失败，已切换到降级模式，请尝试重新抓取一帧或改用上传视频');
+          setLoadError('模型加载失败：' + (err?.message || '未知错误'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -46,9 +47,8 @@ export default function Page() {
   const handleFrame = async () => {
     if (!detector || !videoRef.current) return;
     try {
-      const estimationConfig = { flipHorizontal: false };
-      const timestamp = performance.now();
-      const ps = await detector.estimatePoses(videoRef.current, estimationConfig, timestamp);
+      // 兼容 tfjs / mediapipe detector 的调用方式
+      const ps = await detector.estimatePoses(videoRef.current);
       setPoses(ps);
       if (ps && ps[0]) {
         const s = evaluateShot(ps[0], activeRules);
@@ -57,7 +57,7 @@ export default function Page() {
       }
     } catch (err) {
       console.error('estimate pose failed', err);
-      setLoadError('当前视频帧无法识别，请换角度或上传视频重新分析');
+      setLoadError('当前帧无法识别，请换角度或上传视频');
     }
   };
 

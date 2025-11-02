@@ -2,40 +2,55 @@ import * as poseDetection from '@tensorflow-models/pose-detection';
 import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-backend-webgl';
 import '@tensorflow/tfjs-backend-cpu';
+import '@mediapipe/pose';
 
 let detector: poseDetection.PoseDetector | null = null;
 let loadingPromise: Promise<poseDetection.PoseDetector> | null = null;
 
-async function initDetector() {
-  // 1. 选择一个可用的后端，优先 webgl，不行就 cpu
+async function createTfjsDetector() {
   const candidates: Array<'webgl' | 'cpu'> = ['webgl', 'cpu'];
-  let ready = false;
+  let ok = false;
   for (const b of candidates) {
     try {
       await tf.setBackend(b);
       await tf.ready();
-      ready = true;
+      ok = true;
       break;
     } catch (err) {
-      console.warn('[pose] backend init failed:', b, err);
+      console.warn('[pose] tfjs backend failed:', b, err);
     }
   }
-  if (!ready) {
-    throw new Error('No TFJS backend available');
+  if (!ok) {
+    throw new Error('tfjs backends (webgl/cpu) not available');
   }
+  const cfg: any = {
+    modelType: 'singlepose.Lightning',
+    enableSmoothing: true,
+  };
+  const d = (await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, cfg)) as poseDetection.PoseDetector;
+  return d;
+}
 
-  // 2. 创建 MoveNet 检测器
-  //   NOTE: pose-detection 的类型里不一定导出 movenet 命名空间，
-  //   所以这里直接用 any 来绕过 TS，在运行期仍然是标准配置。
-  const detector = (await poseDetection.createDetector(
-    poseDetection.SupportedModels.MoveNet,
+async function createMediapipeDetector() {
+  const md = (await poseDetection.createDetector(
+    poseDetection.SupportedModels.BlazePose,
     {
-      modelType: 'singlepose.Lightning',
-      enableSmoothing: true,
+      runtime: 'mediapipe',
+      solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose',
+      modelType: 'lite',
     } as any
   )) as poseDetection.PoseDetector;
+  return md;
+}
 
-  return detector;
+async function initDetector() {
+  // 先尝试 tfjs (webgl/cpu)，失败再尝试 mediapipe，这样能兼容 iOS Safari
+  try {
+    return await createTfjsDetector();
+  } catch (err) {
+    console.warn('[pose] tfjs movenet failed, fallback to mediapipe', err);
+    return await createMediapipeDetector();
+  }
 }
 
 export async function loadDetector() {
